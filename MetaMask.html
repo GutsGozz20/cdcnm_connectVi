@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>User Management</title>
+    <script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js@1.3.6/dist/web3.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding-top: 50px;
+        }
+        #account {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #555;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        #addUserButton {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #userList {
+            margin-top: 20px;
+            font-size: 18px;
+            color: gray;
+        }
+        hr {
+            width: 50%;
+            margin-top: 20px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .modal-content {
+            background-color: #fff;
+            margin: 10% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 400px;
+            text-align: left;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h2 {
+            margin: 0;
+        }
+        .close {
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            font-weight: bold;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .button-group {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        .cancel-btn {
+            background-color: #ccc;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .save-btn {
+            background-color: #28a745;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="account">Not connected</div>
+    <h1>User Management</h1>
+    <button id="addUserButton">Add User</button>
+    <hr />
+    <button onclick="getAllUsers()">Show All Users</button>
+    <div id="userList">Không có người dùng nào</div>
+
+    <!-- Popup Modal -->
+    <div id="userFormModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>User Form</h2>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <div class="form-group">
+                <label for="userName">Name</label>
+                <input type="text" id="userName" placeholder="Enter user name" />
+            </div>
+            <div class="form-group">
+                <label for="userHealth">Health</label>
+                <input type="number" id="userHealth" placeholder="Enter health value" />
+            </div>
+            <div class="form-group">
+                <label for="userStrength">Strength</label>
+                <input type="number" id="userStrength" placeholder="Enter strength value" />
+            </div>
+            <div class="button-group">
+                <button class="cancel-btn" onclick="closeModal()">Cancel</button>
+                <button class="save-btn" onclick="saveUser()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+      const contractAddress = "0x04258eFe8B1Af8e9505538372e6EFF482BedB042";
+      const contractABI = [
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "_name",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_health",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_strength",
+				"type": "uint256"
+			}
+		],
+		"name": "createUser",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "deleteUser",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "_name",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_health",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_strength",
+				"type": "uint256"
+			}
+		],
+		"name": "updateUser",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "health",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "strength",
+				"type": "uint256"
+			}
+		],
+		"name": "UserCreated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "UserDeleted",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "health",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "strength",
+				"type": "uint256"
+			}
+		],
+		"name": "UserUpdated",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "getAllUsers",
+		"outputs": [
+			{
+				"internalType": "address[]",
+				"name": "",
+				"type": "address[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_address",
+				"type": "address"
+			}
+		],
+		"name": "getUser",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+]
+  
+      let web3;
+      let userContract;
+  
+      window.addEventListener('load', async () => {
+          if (typeof window.ethereum === 'undefined') {
+              alert('Please install MetaMask!');
+              return;
+          }
+  
+          web3 = new Web3(window.ethereum);
+          try {
+              await window.ethereum.request({ method: 'eth_requestAccounts' });
+              const accounts = await web3.eth.getAccounts();
+              document.getElementById('account').innerText = "Connected: " + accounts[0];
+  
+              // Khởi tạo hợp đồng
+              userContract = new web3.eth.Contract(contractABI, contractAddress);
+              await getAllUsers(); // Lấy danh sách người dùng khi khởi tạo
+          } catch (error) {
+              document.getElementById('account').innerText = "Connection failed";
+          }
+      });
+  
+      document.getElementById('addUserButton').addEventListener('click', () => {
+          document.getElementById('userFormModal').style.display = 'block';
+      });
+  
+      function closeModal() {
+          document.getElementById('userFormModal').style.display = 'none';
+          // Đặt lại các giá trị của form
+          document.getElementById('userName').value = '';
+          document.getElementById('userHealth').value = '';
+          document.getElementById('userStrength').value = '';
+      }
+  
+      async function saveUser() {
+        const name = document.getElementById('userName').value;
+        const health = document.getElementById('userHealth').value;
+        const strength = document.getElementById('userStrength').value;
+
+        if (!name || !health || !strength) {
+            alert('Please fill in all fields.');
+            return;
+        }
+
+        const accounts = await web3.eth.getAccounts();
+        try {
+            await userContract.methods.createUser(name, health, strength).send({ from: accounts[0] });
+            alert('User created successfully!');
+            closeModal();
+            await getAllUsers();
+        } catch (error) {
+            console.error('Error creating user:', error);
+            alert(`There was an error creating the user: ${error.message}`);
+        }
+    }
+    
+  
+      async function getAllUsers() {
+        const userListElement = document.getElementById('userList');
+        userListElement.innerHTML = ''; // Xóa nội dung cũ
+
+        if (!userContract) {
+            userListElement.innerText = 'Không thể kết nối đến hợp đồng.';
+            return;
+        }
+
+        try {
+            const addresses = await userContract.methods.getAllUsers().call();
+            if (addresses.length === 0) {
+                userListElement.innerHTML = '<p>Không có người dùng nào</p>';
+                return;
+            }
+
+            for (const address of addresses) {
+                const user = await userContract.methods.getUser(address).call();
+                const userName = user[0];
+                const userHealth = user[1];
+                const userStrength = user[2];
+
+                const userDiv = document.createElement('div');
+                userDiv.classList.add('user-item');
+                userDiv.innerHTML = `
+                    <p>
+                    <strong>Name:</strong> ${userName} <br>
+                    <strong>Health:</strong> ${userHealth} <br>
+                    <strong>Strength:</strong> ${userStrength} <br>
+                    </p>
+                    <button onclick="updateUserForm('${address}', '${userName}', '${userHealth}', '${userStrength}')">Update</button>
+                    <button onclick="deleteUser('${address}')">Delete</button>
+                `;
+                userListElement.appendChild(userDiv);
+            }
+        } catch (error) {
+            userListElement.innerHTML = '<p>Không thể lấy danh sách người dùng.</p>';
+        }
+    }
+  
+      async function deleteUser(address) {
+          const accounts = await web3.eth.getAccounts();
+          try {
+              await userContract.methods.deleteUser().send({ from: accounts[0] });
+              alert('User deleted successfully!');
+              await getAllUsers();
+          } catch (error) {
+              console.error('Error deleting user:', error);
+              alert(`There was an error deleting the user: ${error.message}`);
+          }
+      }
+  
+      function updateUserForm(address, name, health, strength) {
+          document.getElementById('userName').value = name;
+          document.getElementById('userHealth').value = health;
+          document.getElementById('userStrength').value = strength;
+          document.getElementById('userFormModal').style.display = 'block';
+  
+          // Ghi đè hàm saveUser để gọi updateUser
+          document.querySelector('.save-btn').onclick = async () => {
+              await updateUser(address);
+          };
+      }
+  
+      async function updateUser(address) {
+          const name = document.getElementById('userName').value;
+          const health = document.getElementById('userHealth').value;
+          const strength = document.getElementById('userStrength').value;
+  
+          const accounts = await web3.eth.getAccounts();
+          try {
+              await userContract.methods.updateUser(name, health, strength).send({ from: accounts[0] });
+              alert('User updated successfully!');
+              closeModal();
+              await getAllUsers();
+          } catch (error) {
+              console.error('Error updating user:', error);
+              alert(`There was an error updating the user: ${error.message}`);
+          }
+      }
+  </script>
